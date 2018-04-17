@@ -1,5 +1,3 @@
-data_raw/Kinect_video/
-data_raw/Multimodal_log/
 *.mp4
 *.avi
 *.wav
