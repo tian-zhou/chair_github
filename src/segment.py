@@ -339,9 +339,9 @@ def proc_myo_yaw():
     df_ope_all.to_csv('../data_proc/segmented/df_ope_all.csv', index=False)
 
 def main():
-##    subject1special()
-##    regular_segment()
-##    merge_segments()
+    subject1special()
+    regular_segment()
+    merge_segments()
     proc_myo_yaw()
 
 if __name__ == '__main__':

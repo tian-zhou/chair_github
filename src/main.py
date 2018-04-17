@@ -32,9 +32,6 @@ def load_relevant_files():
 def visualize_segments():
     df, feature_names, selected_feature_names = load_relevant_files()
     for feat_idx, feature in enumerate(selected_feature_names):
-##        if feature != 'Myo_yaw':
-##            continue
-
         print "Visualize feature %s" % feature
         plt.figure(figsize=(12, 8))
         for subj_idx, subject in enumerate([1,2,3,5,6,7,8]):
