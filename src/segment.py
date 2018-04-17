@@ -44,10 +44,10 @@ class ReadMultiModal():
         df_mmdata = pd.read_csv(filename, sep=" ", header=None)
         df_mmdata.columns = column_names
         df_mmdata = df_mmdata.drop('extra', 1)
-        df_mmdata.describe().to_csv('temp_descirbe.csv')
-        self.df_mmdata = df_mmdata
-
         realtime_obj = pd.to_datetime(df_mmdata['realtime_str'], format='%Y_%m_%d_%H_%M_%S_%f')
+        df_mmdata['realtime_obj'] = realtime_obj
+        df_mmdata.describe().to_csv('../temp/descirbe.csv')
+        self.df_mmdata = df_mmdata
         self.diff_time = (realtime_obj-self.REF_TIME).dt.total_seconds().values
 
         print "%i rows read from %s " % (len(df_mmdata), filename)
@@ -161,8 +161,8 @@ class ReadMultiModal():
             df_ope = df_ope.append(ope, ignore_index=True)
 
         if verbose:
-            df_req.to_csv('temp_df_req.csv', index=False)
-            df_ope.to_csv('temp_df_ope.csv', index=False)
+            df_req.to_csv('../temp/df_req.csv', index=False)
+            df_ope.to_csv('../temp/df_ope.csv', index=False)
 
         return df_req, df_ope
 
@@ -257,10 +257,6 @@ def subject1special():
     df_ope.to_csv('../data_proc/segmented/'+str(subjID)+'_df_ope.csv', index=False)
     print "df_req and df_ope written into ../data_proc/segmented/"
 
-def subject4special():
-    pass
-
-
 def regular_segment():
     # init multimodal reading
     parseMM = ReadMultiModal()
@@ -276,7 +272,7 @@ def regular_segment():
         anno_bank = load_files(fname)
 
         # read multimodal data
-        parseMM.read('../data/Multimodal_log/'+fname+'.txt')
+        parseMM.read('../data_raw/Multimodal_log/'+fname+'.txt')
 
         # build dict for mapping time to index for faster query
         time2idx = dict()
@@ -289,14 +285,64 @@ def regular_segment():
         # segment request and operation data
         df_req, df_ope = parseMM.segment(anno_bank, subjID, time2idx, verbose)
 
-        df_req.to_pickle('../data/formatted/'+str(subjID)+'_df_req.pkl')
-        df_ope.to_pickle('../data/formatted/'+str(subjID)+'_df_ope.pkl')
-        df_req.to_csv('../data/formatted/'+str(subjID)+'_df_req.csv', index=False)
-        df_ope.to_csv('../data/formatted/'+str(subjID)+'_df_ope.csv', index=False)
-        print "df_req and df_ope written into ../data/formatted"
+        df_req.to_pickle('../data_proc/segmented/'+str(subjID)+'_df_req.pkl')
+        df_ope.to_pickle('../data_proc/segmented/'+str(subjID)+'_df_ope.pkl')
+        df_req.to_csv('../data_proc/segmented/'+str(subjID)+'_df_req.csv', index=False)
+        df_ope.to_csv('../data_proc/segmented/'+str(subjID)+'_df_ope.csv', index=False)
+        print "df_req and df_ope written into ../data_proc/segmented/"
+
+def merge_segments():
+    # for each subject
+    subjs = [1,2,3,5,6,7,8]
+    df_req_all = pd.DataFrame()
+    df_ope_all = pd.DataFrame()
+    for subjID in subjs:
+        df_req = pd.read_pickle('../data_proc/segmented/'+str(subjID)+'_df_req.pkl')
+        df_ope = pd.read_pickle('../data_proc/segmented/'+str(subjID)+'_df_ope.pkl')
+        df_req_all = df_req_all.append(df_req, ignore_index=True)
+        df_ope_all = df_ope_all.append(df_ope, ignore_index=True)
+
+    df_req_all.to_pickle('../data_proc/segmented/df_req_all.pkl')
+    df_ope_all.to_pickle('../data_proc/segmented/df_ope_all.pkl')
+    df_req_all.to_csv('../data_proc/segmented/df_req_all.csv', index=False)
+    df_ope_all.to_csv('../data_proc/segmented/df_ope_all.csv', index=False)
+
+def proc_myo_yaw():
+    """
+    Manually remove the noise due to the yaw drifting.
+    Since there is a constant drifting, we can use the difference instead of the
+    actual value. The difference makes more sense.
+    Due to the jump between -PI and PI, I zero-out any values larger than 2.
+    This is a manual inspection and looking at the data.
+    Read the pkl, change it, then save back to the same pkl and csv files
+    !!! modifies original files !!!
+    """
+    df_req_all = pd.read_pickle('../data_proc/segmented/df_req_all.pkl')
+    df_ope_all = pd.read_pickle('../data_proc/segmented/df_ope_all.pkl')
+    for i in df_req_all.index:
+        Myo_yaw = df_req_all.loc[i]['mm_data']['Myo_yaw'].values
+        Myo_yaw[1:] = Myo_yaw[1:] - Myo_yaw[:-1]
+        Myo_yaw[0] = 0
+        Myo_yaw[np.abs(Myo_yaw) >= 2] = 0
+        df_req_all.loc[i]['mm_data']['Myo_yaw'] = Myo_yaw
+
+    for i in df_ope_all.index:
+        Myo_yaw = df_ope_all.loc[i]['mm_data']['Myo_yaw'].values
+        Myo_yaw[1:] = Myo_yaw[1:] - Myo_yaw[:-1]
+        Myo_yaw[0] = 0
+        Myo_yaw[np.abs(Myo_yaw) >= 2] = 0
+        df_ope_all.loc[i]['mm_data']['Myo_yaw'] = Myo_yaw
+
+    df_req_all.to_pickle('../data_proc/segmented/df_req_all.pkl')
+    df_ope_all.to_pickle('../data_proc/segmented/df_ope_all.pkl')
+    df_req_all.to_csv('../data_proc/segmented/df_req_all.csv', index=False)
+    df_ope_all.to_csv('../data_proc/segmented/df_ope_all.csv', index=False)
 
 def main():
-    subject4special()
+##    subject1special()
+##    regular_segment()
+##    merge_segments()
+    proc_myo_yaw()
 
 if __name__ == '__main__':
     main()
